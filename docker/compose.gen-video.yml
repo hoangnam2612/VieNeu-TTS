@@ -1,0 +1,36 @@
+name: vieneu-local
+services:
+  vieneu:
+    container_name: gen_video_vieneu
+    image: vieneu-gen-video:cpu
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gen-video
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${VIENEU_PORT:-17860}:8000"
+    environment:
+      VIENEU_THREADS: ${VIENEU_THREADS:-6}
+      # Set VIENEU_OFFLINE=0 only for the first model download; then cached-only.
+      HF_HUB_OFFLINE: ${VIENEU_OFFLINE:-1}
+      HF_HUB_DOWNLOAD_TIMEOUT: 120
+      HF_HUB_ETAG_TIMEOUT: 30
+    volumes:
+      - vieneu_cache:/home/app/.cache
+    mem_limit: 8g
+    cpus: 6
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30m
+    networks:
+      - gen_video
+volumes:
+  vieneu_cache:
+    name: vieneu_local_cache
+networks:
+  gen_video:
+    external: true
+    name: ${GEN_VIDEO_NETWORK:-gen-video_gen_video_network}

@@ -1,0 +1,25 @@
+FROM python:3.12-slim-bookworm
+
+ENV PYTHONUNBUFFERED=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_LINK_MODE=copy \
+    PATH=/opt/venv/bin:$PATH \
+    PYTHONPATH=/workspace/src:/workspace \
+    HF_HOME=/home/app/.cache/huggingface \
+    XDG_CACHE_HOME=/home/app/.cache \
+    HF_HUB_DISABLE_TELEMETRY=1
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libsndfile1 ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 1000 app \
+    && mkdir -p /workspace /opt/venv /home/app/.cache \
+    && chown -R app:app /workspace /opt/venv /home/app/.cache
+WORKDIR /workspace
+COPY --chown=app:app pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project --no-build
+COPY --chown=app:app src/ src/
+COPY --chown=app:app apps/ apps/
+USER app
+EXPOSE 8000
+CMD ["python", "-m", "uvicorn", "apps.gen_video_api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
